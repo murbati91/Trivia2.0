@@ -30,6 +30,9 @@
         "projectId": "99bdcee1-291a-4806-9ca0-22dccecd2021"
       }
     },
-    "owner": "fais91"
+    "owner": "fais91",
+    "android": {
+      "package": "com.fais91.triviagame"
+    }
   }
 }
