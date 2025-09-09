@@ -1,6 +1,6 @@
-# 5osh Fkra Trivia Game
+# Trivia Game
 
-A modern, bilingual trivia game built with Expo and React Native, designed for the GCC market. Features comprehensive gameplay mechanics, admin dashboard, and cross-platform compatibility.
+A modern, bilingual trivia game built with Expo and React Native. Features comprehensive gameplay mechanics, admin dashboard, and cross-platform compatibility.
 
 ## 🎮 Features
 
@@ -59,7 +59,7 @@ Before you begin, ensure you have the following installed on your system:
 ### 1. Clone the Repository
 ```bash
 git clone <repository-url>
-cd 5osh-fkra-trivia-game
+cd trivia-game
 ```
 
 ### 2. Install Dependencies
@@ -126,7 +126,7 @@ Once the development server starts, you'll see a QR code and several options:
 ## 📁 Project Structure
 
 ```
-5osh-fkra-trivia-game/
+trivia-game/
 ├── app/                          # Expo Router app directory
 │   ├── (tabs)/                   # Tab-based navigation
 │   │   ├── index.tsx            # Home screen
