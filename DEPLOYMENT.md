@@ -1,6 +1,6 @@
-# 5osh Fkra Trivia Game - Deployment Guide
+# Trivia Game - Deployment Guide
 
-This guide provides comprehensive instructions for deploying and sharing the 5osh Fkra Trivia Game across different platforms and environments.
+This guide provides comprehensive instructions for deploying and sharing the Trivia Game across different platforms and environments.
 
 ## 📋 Table of Contents
 
@@ -15,7 +15,7 @@ This guide provides comprehensive instructions for deploying and sharing the 5os
 
 ## 🌐 Deployment Overview
 
-The 5osh Fkra Trivia Game can be deployed across multiple platforms:
+The Trivia Game can be deployed across multiple platforms:
 
 - **Development Sharing**: Expo Go app, Development builds
 - **Web**: Static hosting (Netlify, Vercel, AWS S3)
@@ -172,8 +172,8 @@ Development builds provide a more native experience and support custom native co
    // app.json
    {
      "expo": {
-       "owner": "your-org-name",
-       "slug": "5osh-fkra-trivia"
+       "owner": "trivia-org",
+       "slug": "trivia-game"
      }
    }
    ```
@@ -209,7 +209,7 @@ Create a simple web portal for team access:
 <!DOCTYPE html>
 <html>
 <head>
-    <title>5osh Fkra - Team Builds</title>
+    <title>Trivia Game - Team Builds</title>
 </head>
 <body>
     <h1>Latest Builds</h1>
@@ -366,7 +366,7 @@ aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --path
    {
      "expo": {
        "ios": {
-         "bundleIdentifier": "com.khoshfkra.trivia",
+         "bundleIdentifier": "com.triviagame.app",
          "buildNumber": "1.0.0"
        }
      }
@@ -413,7 +413,7 @@ eas submit --platform ios --track testflight
    {
      "expo": {
        "android": {
-         "package": "com.khoshfkra.trivia",
+         "package": "com.triviagame.app",
          "versionCode": 1
        }
      }
@@ -459,12 +459,12 @@ const environments = {
     ANALYTICS_ENABLED: false
   },
   staging: {
-    API_URL: 'https://staging-api.khoshfkra.com',
+    API_URL: 'https://staging-api.triviagame.com',
     DEBUG: true,
     ANALYTICS_ENABLED: true
   },
   production: {
-    API_URL: 'https://api.khoshfkra.com',
+    API_URL: 'https://api.triviagame.com',
     DEBUG: false,
     ANALYTICS_ENABLED: true
   }
@@ -482,8 +482,8 @@ export default ({ config }) => {
   
   return {
     ...config,
-    name: environment === 'production' ? '5osh Fkra' : `5osh Fkra (${environment})`,
-    slug: 'khosh-fkra-trivia',
+    name: environment === 'production' ? 'Trivia Game' : `Trivia Game (${environment})`,
+    slug: 'trivia-game',
     extra: {
       environment,
       apiUrl: process.env.API_URL,

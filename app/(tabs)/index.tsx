@@ -100,9 +100,9 @@ export default function HomeScreen() {
         end={{ x: 1, y: 1 }}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
-            <Text style={styles.logoText}>5osh Fkra</Text>
+            <Text style={styles.logoText}>Trivia Game</Text>
             <Text style={styles.logoSubtext}>
-              {isArabic ? 'خوش فكرة' : 'Trivia Challenge'}
+              {isArabic ? 'لعبة المعرفة' : 'Trivia Challenge'}
             </Text>
           </View>
           <TouchableOpacity

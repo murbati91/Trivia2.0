@@ -270,7 +270,7 @@ export default function GameScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}>
           <Text style={styles.welcomeTitle}>
-            {isArabic ? 'مرحباً بك في خوش فكرة!' : 'Welcome to 5osh Fkra!'}
+            {isArabic ? 'مرحباً بك في لعبة المعرفة!' : 'Welcome to Trivia Game!'}
           </Text>
           <Text style={styles.welcomeSubtitle}>
             {isArabic ? 'اختبر معرفتك وتحدى أصدقاءك' : 'Test your knowledge and challenge your friends'}
