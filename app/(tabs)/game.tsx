@@ -9,21 +9,23 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Heart, Zap, Users, CircleCheck as CheckCircle, Circle as XCircle, RotateCcw, Share2 } from 'lucide-react-native';
+import { Clock, Heart, Zap, Users, CircleCheck as CheckCircle, Circle as XCircle, RotateCcw, Share2, Globe, Wifi, WifiOff } from 'lucide-react-native';
+import { supabase, getFallbackQuestions, testSupabaseConnection } from '../../config/supabase';
 
 const { width } = Dimensions.get('window');
 
 interface Question {
   id: number;
   question: string;
-  questionAr: string;
+  question_ar: string;
   options: string[];
-  optionsAr: string[];
-  correctAnswer: number;
+  options_ar: string[];
+  correct_answer: number;
   category: string;
   difficulty: 'easy' | 'medium' | 'hard';
-  explanation: string;
-  explanationAr: string;
+  explanation?: string;
+  explanation_ar?: string;
+  is_active?: boolean;
 }
 
 interface GameState {
@@ -44,6 +46,9 @@ interface GameState {
 
 export default function GameScreen() {
   const [isArabic, setIsArabic] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'testing'>('testing');
   const [gameState, setGameState] = useState<GameState>({
     currentQuestion: 0,
     score: 0,
@@ -60,70 +65,62 @@ export default function GameScreen() {
     },
   });
 
-  const [questions] = useState<Question[]>([
-    {
-      id: 1,
-      question: "What is the capital of Bahrain?",
-      questionAr: "ما هي عاصمة البحرين؟",
-      options: ["Manama", "Dubai", "Doha", "Kuwait City"],
-      optionsAr: ["المنامة", "دبي", "الدوحة", "مدينة الكويت"],
-      correctAnswer: 0,
-      category: "Geography",
-      difficulty: "easy",
-      explanation: "Manama is the capital and largest city of Bahrain.",
-      explanationAr: "المنامة هي عاصمة البحرين وأكبر مدينة فيها.",
-    },
-    {
-      id: 2,
-      question: "Which year did the first iPhone launch?",
-      questionAr: "في أي عام تم إطلاق أول آيفون؟",
-      options: ["2006", "2007", "2008", "2009"],
-      optionsAr: ["2006", "2007", "2008", "2009"],
-      correctAnswer: 1,
-      category: "Technology",
-      difficulty: "medium",
-      explanation: "The first iPhone was announced by Steve Jobs on January 9, 2007.",
-      explanationAr: "تم الإعلان عن أول آيفون من قِبل ستيف جوبز في 9 يناير 2007.",
-    },
-    {
-      id: 3,
-      question: "What is the largest planet in our solar system?",
-      questionAr: "ما هو أكبر كوكب في النظام الشمسي؟",
-      options: ["Saturn", "Jupiter", "Neptune", "Earth"],
-      optionsAr: ["زحل", "المشتري", "نبتون", "الأرض"],
-      correctAnswer: 1,
-      category: "Science",
-      difficulty: "easy",
-      explanation: "Jupiter is the largest planet in our solar system.",
-      explanationAr: "المشتري هو أكبر كوكب في النظام الشمسي.",
-    },
-    {
-      id: 4,
-      question: "Who wrote the novel '1984'?",
-      questionAr: "من كتب رواية '1984'؟",
-      options: ["George Orwell", "Aldous Huxley", "Ray Bradbury", "Kurt Vonnegut"],
-      optionsAr: ["جورج أورويل", "ألدوس هكسلي", "راي برادبوري", "كيرت فونيغوت"],
-      correctAnswer: 0,
-      category: "Literature",
-      difficulty: "medium",
-      explanation: "George Orwell wrote the dystopian novel '1984' published in 1949.",
-      explanationAr: "كتب جورج أورويل الرواية المستقبلية '1984' التي نُشرت في عام 1949.",
-    },
-    {
-      id: 5,
-      question: "What is the chemical symbol for gold?",
-      questionAr: "ما هو الرمز الكيميائي للذهب؟",
-      options: ["Go", "Gd", "Au", "Ag"],
-      optionsAr: ["Go", "Gd", "Au", "Ag"],
-      correctAnswer: 2,
-      category: "Science",
-      difficulty: "medium",
-      explanation: "Au is the chemical symbol for gold, derived from the Latin word 'aurum'.",
-      explanationAr: "Au هو الرمز الكيميائي للذهب، مشتق من الكلمة اللاتينية 'aurum'.",
-    },
-  ]);
-
   const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
+
+  // Test connection and fetch questions
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  const initializeApp = async () => {
+    setLoading(true);
+    setConnectionStatus('testing');
+    
+    // Test connection first
+    const connectionTest = await testSupabaseConnection();
+    
+    if (connectionTest.success) {
+      setConnectionStatus('connected');
+      await fetchQuestionsFromSupabase();
+    } else {
+      console.warn('Supabase connection failed, using offline mode:', connectionTest.message);
+      setConnectionStatus('offline');
+      setQuestions(getFallbackQuestions());
+      setLoading(false);
+    }
+  };
+
+  const fetchQuestionsFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('is_active', true)
+        .limit(20);
+
+      if (error) {
+        throw error;
+      } else {
+        const formattedQuestions = data?.map(q => ({
+          ...q,
+          options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
+          options_ar: Array.isArray(q.options_ar) ? q.options_ar : JSON.parse(q.options_ar || '[]'),
+        })) || [];
+        
+        setQuestions(formattedQuestions.length > 0 ? formattedQuestions : getFallbackQuestions());
+      }
+    } catch (error) {
+      console.error('Error fetching from Supabase:', error);
+      setConnectionStatus('offline');
+      setQuestions(getFallbackQuestions());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const retryConnection = async () => {
+    await initializeApp();
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -138,6 +135,14 @@ export default function GameScreen() {
   }, [gameState.timeLeft, gameState.isGameActive, gameState.showExplanation]);
 
   const startGame = (mode: 'single' | 'multiplayer') => {
+    if (questions.length === 0) {
+      Alert.alert(
+        isArabic ? 'خطأ' : 'Error',
+        isArabic ? 'لا توجد أسئلة متاحة' : 'No questions available'
+      );
+      return;
+    }
+
     setGameState({
       currentQuestion: 0,
       score: 0,
@@ -163,20 +168,20 @@ export default function GameScreen() {
 
     setTimeout(() => {
       const currentQ = questions[gameState.currentQuestion];
-      const isCorrect = answerIndex === currentQ.correctAnswer;
-      
+      const isCorrect = answerIndex === currentQ.correct_answer;
+
       if (isCorrect) {
         const points = calculatePoints();
-        setGameState(prev => ({ 
-          ...prev, 
+        setGameState(prev => ({
+          ...prev,
           score: prev.score + points,
-          showExplanation: true 
+          showExplanation: true
         }));
       } else {
-        setGameState(prev => ({ 
-          ...prev, 
+        setGameState(prev => ({
+          ...prev,
           lives: prev.lives - 1,
-          showExplanation: true 
+          showExplanation: true
         }));
       }
     }, 1000);
@@ -185,17 +190,17 @@ export default function GameScreen() {
   const calculatePoints = () => {
     const basePoints = 100;
     const timeBonus = gameState.timeLeft * 2;
-    const difficultyMultiplier = questions[gameState.currentQuestion].difficulty === 'hard' ? 1.5 : 
+    const difficultyMultiplier = questions[gameState.currentQuestion].difficulty === 'hard' ? 1.5 :
                                 questions[gameState.currentQuestion].difficulty === 'medium' ? 1.2 : 1;
     return Math.round((basePoints + timeBonus) * difficultyMultiplier);
   };
 
   const handleTimeUp = () => {
-    setGameState(prev => ({ 
-      ...prev, 
+    setGameState(prev => ({
+      ...prev,
       lives: prev.lives - 1,
       selectedAnswer: -1,
-      showExplanation: true 
+      showExplanation: true
     }));
   };
 
@@ -228,15 +233,15 @@ export default function GameScreen() {
 
   const useFiftyFifty = () => {
     if (gameState.usedLifelines.fiftyFifty || gameState.selectedAnswer !== null) return;
-    
+
     const currentQ = questions[gameState.currentQuestion];
     const wrongOptions = currentQ.options
       .map((_, index) => index)
-      .filter(index => index !== currentQ.correctAnswer);
-    
+      .filter(index => index !== currentQ.correct_answer);
+
     const optionsToHide = wrongOptions.slice(0, 2);
     setHiddenOptions(optionsToHide);
-    
+
     setGameState(prev => ({
       ...prev,
       usedLifelines: { ...prev.usedLifelines, fiftyFifty: true }
@@ -245,12 +250,12 @@ export default function GameScreen() {
 
   const useSkip = () => {
     if (gameState.usedLifelines.skip) return;
-    
+
     setGameState(prev => ({
       ...prev,
       usedLifelines: { ...prev.usedLifelines, skip: true }
     }));
-    
+
     nextQuestion();
   };
 
@@ -261,6 +266,21 @@ export default function GameScreen() {
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>
+          {isArabic ? 'جاري تحميل الأسئلة...' : 'Loading questions...'}
+        </Text>
+        {connectionStatus === 'testing' && (
+          <Text style={styles.subLoadingText}>
+            {isArabic ? 'اختبار الاتصال...' : 'Testing connection...'}
+          </Text>
+        )}
+      </View>
+    );
+  }
+
   if (!gameState.isGameActive && gameState.currentQuestion === 0) {
     return (
       <View style={styles.container}>
@@ -269,12 +289,48 @@ export default function GameScreen() {
           style={styles.startScreen}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}>
+          
+          {/* Connection Status */}
+          <View style={styles.connectionStatus}>
+            {connectionStatus === 'connected' ? (
+              <View style={styles.connectedStatus}>
+                <Wifi size={16} color="#10B981" />
+                <Text style={styles.connectionText}>
+                  {isArabic ? 'متصل' : 'Online'}
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity style={styles.offlineStatus} onPress={retryConnection}>
+                <WifiOff size={16} color="#EF4444" />
+                <Text style={styles.connectionText}>
+                  {isArabic ? 'غير متصل - اضغط للإعادة' : 'Offline - Tap to retry'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Language Toggle */}
+          <TouchableOpacity
+            style={styles.startLanguageToggle}
+            onPress={() => setIsArabic(!isArabic)}>
+            <Globe size={16} color="white" />
+            <Text style={styles.startLanguageText}>
+              {isArabic ? 'EN' : 'عربي'}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.welcomeTitle}>
-            {isArabic ? 'مرحباً بك في لعبة المعرفة!' : 'Welcome to Trivia Game!'}
+            {isArabic ? 'مرحباً بك في لعبة المعرفة!' : 'Welcome to MindSpark Trivia!'}
           </Text>
           <Text style={styles.welcomeSubtitle}>
             {isArabic ? 'اختبر معرفتك وتحدى أصدقاءك' : 'Test your knowledge and challenge your friends'}
           </Text>
+          
+          {connectionStatus === 'offline' && (
+            <Text style={styles.offlineNote}>
+              {isArabic ? 'تعمل حالياً في وضع عدم الاتصال' : 'Currently running in offline mode'}
+            </Text>
+          )}
 
           <View style={styles.gameModeContainer}>
             <TouchableOpacity
@@ -308,13 +364,10 @@ export default function GameScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.languageButton}
-            onPress={() => setIsArabic(!isArabic)}>
-            <Text style={styles.languageButtonText}>
-              {isArabic ? 'Switch to English' : 'التبديل للعربية'}
-            </Text>
-          </TouchableOpacity>
+          {/* App branding */}
+          <Text style={styles.brandingText}>
+            © 2025 Murbati.ai & Salahuddin Softech Solutions
+          </Text>
         </LinearGradient>
       </View>
     );
@@ -388,27 +441,40 @@ export default function GameScreen() {
         style={styles.gameHeader}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}>
-        <View style={styles.gameStats}>
-          <View style={styles.statItem}>
-            <Clock size={20} color="white" />
-            <Text style={styles.statText}>{gameState.timeLeft}s</Text>
+        
+        <View style={styles.gameHeaderTop}>
+          <View style={styles.gameStats}>
+            <View style={styles.statItem}>
+              <Clock size={20} color="white" />
+              <Text style={styles.statText}>{gameState.timeLeft}s</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.scoreText}>{gameState.score}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Heart size={20} color={gameState.lives > 0 ? "#EF4444" : "#9CA3AF"} />
+              <Text style={styles.statText}>×{gameState.lives}</Text>
+            </View>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.scoreText}>{gameState.score}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Heart size={20} color={gameState.lives > 0 ? "#EF4444" : "#9CA3AF"} />
-            <Text style={styles.statText}>×{gameState.lives}</Text>
-          </View>
+
+          {/* Language Toggle in Game Header */}
+          <TouchableOpacity
+            style={styles.headerLanguageToggle}
+            onPress={() => setIsArabic(!isArabic)}>
+            <Globe size={16} color="white" />
+            <Text style={styles.headerLanguageText}>
+              {isArabic ? 'EN' : 'عربي'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View 
+            <View
               style={[
-                styles.progressFill, 
+                styles.progressFill,
                 { width: `${((gameState.currentQuestion + 1) / questions.length) * 100}%` }
-              ]} 
+              ]}
             />
           </View>
           <Text style={styles.progressText}>
@@ -422,15 +488,15 @@ export default function GameScreen() {
           <View style={styles.categoryBadge}>
             <Text style={styles.categoryText}>{currentQuestion.category}</Text>
           </View>
-          
+
           <Text style={styles.questionText}>
-            {isArabic ? currentQuestion.questionAr : currentQuestion.question}
+            {isArabic ? currentQuestion.question_ar : currentQuestion.question}
           </Text>
 
-          {gameState.showExplanation && (
+          {gameState.showExplanation && currentQuestion.explanation && (
             <View style={styles.explanationContainer}>
               <Text style={styles.explanationText}>
-                {isArabic ? currentQuestion.explanationAr : currentQuestion.explanation}
+                {isArabic ? currentQuestion.explanation_ar : currentQuestion.explanation}
               </Text>
             </View>
           )}
@@ -440,7 +506,7 @@ export default function GameScreen() {
           {currentQuestion.options.map((option, index) => {
             const isHidden = hiddenOptions.includes(index);
             const isSelected = gameState.selectedAnswer === index;
-            const isCorrect = index === currentQuestion.correctAnswer;
+            const isCorrect = index === currentQuestion.correct_answer;
             const showResult = gameState.showExplanation;
 
             if (isHidden) return null;
@@ -474,7 +540,7 @@ export default function GameScreen() {
                     </Text>
                   </View>
                   <Text style={textStyle}>
-                    {isArabic ? currentQuestion.optionsAr[index] : option}
+                    {isArabic ? currentQuestion.options_ar[index] : option}
                   </Text>
                 </View>
                 {showResult && isCorrect && (
@@ -528,7 +594,7 @@ export default function GameScreen() {
             style={styles.nextButton}
             onPress={nextQuestion}>
             <Text style={styles.nextButtonText}>
-              {gameState.currentQuestion < questions.length - 1 
+              {gameState.currentQuestion < questions.length - 1
                 ? (isArabic ? 'السؤال التالي' : 'Next Question')
                 : (isArabic ? 'إنهاء اللعبة' : 'Finish Game')
               }
@@ -545,11 +611,71 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  subLoadingText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  connectionStatus: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+  },
+  connectedStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  offlineStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  connectionText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   startScreen: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    position: 'relative',
+  },
+  startLanguageToggle: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  startLanguageText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   welcomeTitle: {
     fontSize: 28,
@@ -562,7 +688,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  offlineNote: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
     marginBottom: 40,
+    fontStyle: 'italic',
   },
   gameModeContainer: {
     width: '100%',
@@ -595,31 +728,32 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
   },
-  languageButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-  },
-  languageButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  brandingText: {
+    position: 'absolute',
+    bottom: 20,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
   },
   gameHeader: {
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
-  gameStats: {
+  gameHeaderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
+  gameStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 20,
   },
   statText: {
     color: 'white',
@@ -631,6 +765,20 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  headerLanguageToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  headerLanguageText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   progressContainer: {
     flexDirection: 'row',
@@ -713,6 +861,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   selectedOption: {
     borderColor: '#3B82F6',

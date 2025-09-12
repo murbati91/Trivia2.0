@@ -428,7 +428,7 @@ export default function ProfileScreen() {
           {isArabic ? 'إصدار التطبيق: 1.0.0' : 'App Version: 1.0.0'}
         </Text>
         <Text style={styles.copyright}>
-          © 2025 Khosh Fkra Media. {isArabic ? 'جميع الحقوق محفوظة' : 'All rights reserved'}
+          © 2025 Murbati.ai & Salahuddin Softech Solutions. {isArabic ? 'جميع الحقوق محفوظة' : 'All rights reserved'}
         </Text>
       </View>
     </ScrollView>
