@@ -9,8 +9,8 @@ import {
   ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Heart, Zap, Users, CircleCheck as CheckCircle, Circle as XCircle, RotateCcw, Share2, Globe, Wifi, WifiOff } from 'lucide-react-native';
-import { supabase, getFallbackQuestions, testSupabaseConnection } from '../../config/supabase';
+import { Clock, Heart, Zap, Users, CircleCheck as CheckCircle, Circle as XCircle, RotateCcw, Share2, Globe } from 'lucide-react-native';
+import { supabase, getFallbackQuestions } from '../../config/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -25,7 +25,6 @@ interface Question {
   difficulty: 'easy' | 'medium' | 'hard';
   explanation?: string;
   explanation_ar?: string;
-  is_active?: boolean;
 }
 
 interface GameState {
@@ -48,7 +47,6 @@ export default function GameScreen() {
   const [isArabic, setIsArabic] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'testing'>('testing');
   const [gameState, setGameState] = useState<GameState>({
     currentQuestion: 0,
     score: 0,
@@ -67,31 +65,14 @@ export default function GameScreen() {
 
   const [hiddenOptions, setHiddenOptions] = useState<number[]>([]);
 
-  // Test connection and fetch questions
+  // Fetch questions from Supabase
   useEffect(() => {
-    initializeApp();
+    fetchQuestions();
   }, []);
 
-  const initializeApp = async () => {
-    setLoading(true);
-    setConnectionStatus('testing');
-    
-    // Test connection first
-    const connectionTest = await testSupabaseConnection();
-    
-    if (connectionTest.success) {
-      setConnectionStatus('connected');
-      await fetchQuestionsFromSupabase();
-    } else {
-      console.warn('Supabase connection failed, using offline mode:', connectionTest.message);
-      setConnectionStatus('offline');
-      setQuestions(getFallbackQuestions());
-      setLoading(false);
-    }
-  };
-
-  const fetchQuestionsFromSupabase = async () => {
+  const fetchQuestions = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('questions')
         .select('*')
@@ -99,27 +80,22 @@ export default function GameScreen() {
         .limit(20);
 
       if (error) {
-        throw error;
+        console.error('Error fetching questions:', error);
+        setQuestions(getFallbackQuestions());
       } else {
         const formattedQuestions = data?.map(q => ({
           ...q,
           options: Array.isArray(q.options) ? q.options : JSON.parse(q.options || '[]'),
           options_ar: Array.isArray(q.options_ar) ? q.options_ar : JSON.parse(q.options_ar || '[]'),
         })) || [];
-        
         setQuestions(formattedQuestions.length > 0 ? formattedQuestions : getFallbackQuestions());
       }
     } catch (error) {
-      console.error('Error fetching from Supabase:', error);
-      setConnectionStatus('offline');
+      console.error('Error connecting to database:', error);
       setQuestions(getFallbackQuestions());
     } finally {
       setLoading(false);
     }
-  };
-
-  const retryConnection = async () => {
-    await initializeApp();
   };
 
   useEffect(() => {
@@ -272,11 +248,6 @@ export default function GameScreen() {
         <Text style={styles.loadingText}>
           {isArabic ? 'جاري تحميل الأسئلة...' : 'Loading questions...'}
         </Text>
-        {connectionStatus === 'testing' && (
-          <Text style={styles.subLoadingText}>
-            {isArabic ? 'اختبار الاتصال...' : 'Testing connection...'}
-          </Text>
-        )}
       </View>
     );
   }
@@ -290,25 +261,6 @@ export default function GameScreen() {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}>
           
-          {/* Connection Status */}
-          <View style={styles.connectionStatus}>
-            {connectionStatus === 'connected' ? (
-              <View style={styles.connectedStatus}>
-                <Wifi size={16} color="#10B981" />
-                <Text style={styles.connectionText}>
-                  {isArabic ? 'متصل' : 'Online'}
-                </Text>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.offlineStatus} onPress={retryConnection}>
-                <WifiOff size={16} color="#EF4444" />
-                <Text style={styles.connectionText}>
-                  {isArabic ? 'غير متصل - اضغط للإعادة' : 'Offline - Tap to retry'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
           {/* Language Toggle */}
           <TouchableOpacity
             style={styles.startLanguageToggle}
@@ -323,14 +275,8 @@ export default function GameScreen() {
             {isArabic ? 'مرحباً بك في لعبة المعرفة!' : 'Welcome to MindSpark Trivia!'}
           </Text>
           <Text style={styles.welcomeSubtitle}>
-            {isArabic ? 'اختبر معرفتك وتحدى أصدقاءك' : 'Test your knowledge and challenge your friends'}
+            {isArabic ? 'اختبر معرفتك وتحدى أصدقاءك' : 'Test your knowledge and challenge your mind'}
           </Text>
-          
-          {connectionStatus === 'offline' && (
-            <Text style={styles.offlineNote}>
-              {isArabic ? 'تعمل حالياً في وضع عدم الاتصال' : 'Currently running in offline mode'}
-            </Text>
-          )}
 
           <View style={styles.gameModeContainer}>
             <TouchableOpacity
@@ -363,11 +309,6 @@ export default function GameScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* App branding */}
-          <Text style={styles.brandingText}>
-            © 2025 Murbati.ai & Salahuddin Softech Solutions
-          </Text>
         </LinearGradient>
       </View>
     );
@@ -620,38 +561,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 16,
     color: '#6B7280',
-    marginBottom: 8,
-  },
-  subLoadingText: {
-    fontSize: 14,
-    color: '#9CA3AF',
-  },
-  connectionStatus: {
-    position: 'absolute',
-    top: 40,
-    left: 20,
-  },
-  connectedStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  offlineStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  connectionText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4,
   },
   startScreen: {
     flex: 1,
@@ -688,14 +597,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
     textAlign: 'center',
-    marginBottom: 20,
-  },
-  offlineNote: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
-    textAlign: 'center',
     marginBottom: 40,
-    fontStyle: 'italic',
   },
   gameModeContainer: {
     width: '100%',
@@ -726,13 +628,6 @@ const styles = StyleSheet.create({
   gameModeSubtitle: {
     fontSize: 14,
     color: '#6B7280',
-    textAlign: 'center',
-  },
-  brandingText: {
-    position: 'absolute',
-    bottom: 20,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.6)',
     textAlign: 'center',
   },
   gameHeader: {

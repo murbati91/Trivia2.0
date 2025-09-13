@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   Switch,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { User, Settings, Bell, Globe, Shield, CircleHelp as HelpCircle, LogOut, CreditCard as Edit, Trophy, Target, Calendar, Star, Volume2, VolumeX, Moon, Sun, Smartphone, Mail, Lock } from 'lucide-react-native';
+import { authService } from '../../config/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -41,16 +43,18 @@ export default function ProfileScreen() {
   const [isArabic, setIsArabic] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [selectedSection, setSelectedSection] = useState<'profile' | 'settings' | 'help'>('profile');
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    name: "Ahmed Al-Rashid",
-    nameAr: "أحمد الراشد",
-    email: "ahmed.rashid@example.com",
-    level: 25,
-    totalScore: 18750,
-    gamesPlayed: 89,
-    winRate: 87.6,
-    joinDate: "2024-03-15",
+    name: "",
+    nameAr: "",
+    email: "",
+    level: 1,
+    totalScore: 0,
+    gamesPlayed: 0,
+    winRate: 0,
+    joinDate: new Date().toISOString().split('T')[0],
     country: "🇧🇭 Bahrain",
     avatar: "👨‍💼",
   });
@@ -66,13 +70,68 @@ export default function ProfileScreen() {
 
   const [editedProfile, setEditedProfile] = useState({ ...userProfile });
 
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      const user = await authService.getCurrentUser();
+      
+      if (user) {
+        setCurrentUser(user);
+        
+        // Load user profile from database
+        const { data: profile, error } = await authService.getUserProfile(user.id);
+        
+        if (profile) {
+          const profileData = {
+            name: profile.name || user.user_metadata?.name || '',
+            nameAr: profile.name_ar || user.user_metadata?.name_ar || '',
+            email: user.email || '',
+            level: profile.level || 1,
+            totalScore: profile.total_score || 0,
+            gamesPlayed: profile.games_played || 0,
+            winRate: profile.games_played > 0 ? (profile.games_won / profile.games_played * 100) : 0,
+            joinDate: user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+            country: profile.country || "🇧🇭 Bahrain",
+            avatar: profile.avatar || "👨‍💼",
+          };
+          setUserProfile(profileData);
+          setEditedProfile(profileData);
+        } else {
+          // Create initial profile
+          const initialProfile = {
+            name: user.user_metadata?.name || '',
+            nameAr: user.user_metadata?.name_ar || '',
+            email: user.email || '',
+            level: 1,
+            totalScore: 0,
+            gamesPlayed: 0,
+            winRate: 0,
+            joinDate: user.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+            country: "🇧🇭 Bahrain",
+            avatar: "👨‍💼",
+          };
+          setUserProfile(initialProfile);
+          setEditedProfile(initialProfile);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const achievements = [
-    { id: 1, name: isArabic ? 'أول انتصار' : 'First Victory', icon: '🏆', unlocked: true },
-    { id: 2, name: isArabic ? 'عاشق المعرفة' : 'Knowledge Lover', icon: '📚', unlocked: true },
-    { id: 3, name: isArabic ? 'خبير التاريخ' : 'History Expert', icon: '🏛️', unlocked: true },
-    { id: 4, name: isArabic ? 'عالم الجغرافيا' : 'Geography Master', icon: '🌍', unlocked: false },
-    { id: 5, name: isArabic ? 'نجم الرياضة' : 'Sports Star', icon: '⚽', unlocked: true },
-    { id: 6, name: isArabic ? 'عبقري العلوم' : 'Science Genius', icon: '🔬', unlocked: false },
+    { id: 1, name: isArabic ? 'أول انتصار' : 'First Victory', icon: '🏆', unlocked: userProfile.gamesPlayed > 0 },
+    { id: 2, name: isArabic ? 'عاشق المعرفة' : 'Knowledge Lover', icon: '📚', unlocked: userProfile.totalScore > 500 },
+    { id: 3, name: isArabic ? 'خبير التاريخ' : 'History Expert', icon: '🏛️', unlocked: userProfile.level > 5 },
+    { id: 4, name: isArabic ? 'عالم الجغرافيا' : 'Geography Master', icon: '🌍', unlocked: userProfile.level > 10 },
+    { id: 5, name: isArabic ? 'نجم الرياضة' : 'Sports Star', icon: '⚽', unlocked: userProfile.winRate > 70 },
+    { id: 6, name: isArabic ? 'عبقري العلوم' : 'Science Genius', icon: '🔬', unlocked: userProfile.level > 15 },
   ];
 
   const stats = [
@@ -96,7 +155,7 @@ export default function ProfileScreen() {
     },
     { 
       label: isArabic ? 'معدل الفوز' : 'Win Rate', 
-      value: `${userProfile.winRate}%`, 
+      value: `${userProfile.winRate.toFixed(1)}%`, 
       icon: Calendar, 
       color: '#8B5CF6' 
     },
@@ -108,13 +167,31 @@ export default function ProfileScreen() {
     { key: 'help', label: isArabic ? 'المساعدة' : 'Help', icon: HelpCircle },
   ];
 
-  const handleSaveProfile = () => {
-    setUserProfile({ ...editedProfile });
-    setIsEditingProfile(false);
-    Alert.alert(
-      isArabic ? 'تم الحفظ' : 'Saved',
-      isArabic ? 'تم حفظ الملف الشخصي بنجاح' : 'Profile saved successfully'
-    );
+  const handleSaveProfile = async () => {
+    try {
+      if (!currentUser) return;
+      
+      const { error } = await authService.updateProfile(currentUser.id, {
+        name: editedProfile.name,
+        name_ar: editedProfile.nameAr,
+        country: editedProfile.country,
+        avatar: editedProfile.avatar,
+      });
+
+      if (error) throw error;
+
+      setUserProfile({ ...editedProfile });
+      setIsEditingProfile(false);
+      Alert.alert(
+        isArabic ? 'تم الحفظ' : 'Saved',
+        isArabic ? 'تم حفظ الملف الشخصي بنجاح' : 'Profile saved successfully'
+      );
+    } catch (error: any) {
+      Alert.alert(
+        isArabic ? 'خطأ' : 'Error',
+        error.message || (isArabic ? 'حدث خطأ أثناء الحفظ' : 'Failed to save profile')
+      );
+    }
   };
 
   const handleLogout = () => {
@@ -126,9 +203,13 @@ export default function ProfileScreen() {
         { 
           text: isArabic ? 'تسجيل الخروج' : 'Logout', 
           style: 'destructive',
-          onPress: () => {
-            // Handle logout logic here
-            console.log('User logged out');
+          onPress: async () => {
+            try {
+              await authService.signOut();
+              // The app will automatically redirect to auth screen
+            } catch (error) {
+              console.error('Logout error:', error);
+            }
           }
         },
       ]
@@ -137,7 +218,23 @@ export default function ProfileScreen() {
 
   const updateSetting = (key: keyof UserSettings, value: any) => {
     setUserSettings({ ...userSettings, [key]: value });
+    
+    // Apply dark mode immediately
+    if (key === 'darkMode') {
+      // You can implement dark mode theme switching here
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>
+          {isArabic ? 'جاري التحميل...' : 'Loading...'}
+        </Text>
+      </View>
+    );
+  }
 
   const renderProfileSection = () => (
     <ScrollView style={styles.sectionContent} showsVerticalScrollIndicator={false}>
@@ -162,13 +259,6 @@ export default function ProfileScreen() {
                 onChangeText={(text) => setEditedProfile({ ...editedProfile, nameAr: text })}
                 placeholder={isArabic ? 'الاسم بالعربية' : 'Arabic Name'}
               />
-              <TextInput
-                style={styles.emailInput}
-                value={editedProfile.email}
-                onChangeText={(text) => setEditedProfile({ ...editedProfile, email: text })}
-                placeholder={isArabic ? 'البريد الإلكتروني' : 'Email'}
-                keyboardType="email-address"
-              />
               <View style={styles.editActions}>
                 <TouchableOpacity 
                   style={styles.saveButton} 
@@ -192,9 +282,13 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.profileDisplay}>
               <Text style={styles.userName}>
-                {isArabic ? userProfile.nameAr : userProfile.name}
+                {isArabic ? userProfile.nameAr || userProfile.name : userProfile.name}
               </Text>
               <Text style={styles.userEmail}>{userProfile.email}</Text>
+              <Text style={styles.joinDate}>
+                {isArabic ? 'انضم في ' : 'Joined '}
+                {new Date(userProfile.joinDate).toLocaleDateString()}
+              </Text>
               <TouchableOpacity 
                 style={styles.editButton}
                 onPress={() => setIsEditingProfile(true)}>
@@ -328,52 +422,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.settingGroup}>
-        <Text style={styles.settingGroupTitle}>
-          {isArabic ? 'الخصوصية' : 'Privacy & Security'}
-        </Text>
-        
-        <View style={styles.settingItem}>
-          <View style={styles.settingLeft}>
-            <Mail size={20} color="#3B82F6" />
-            <Text style={styles.settingLabel}>
-              {isArabic ? 'تحديثات البريد' : 'Email Updates'}
-            </Text>
-          </View>
-          <Switch
-            value={userSettings.emailUpdates}
-            onValueChange={(value) => updateSetting('emailUpdates', value)}
-            trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-            thumbColor="white"
-          />
-        </View>
-
-        <View style={styles.settingItem}>
-          <View style={styles.settingLeft}>
-            <Smartphone size={20} color="#3B82F6" />
-            <Text style={styles.settingLabel}>
-              {isArabic ? 'الإشعارات الفورية' : 'Push Notifications'}
-            </Text>
-          </View>
-          <Switch
-            value={userSettings.pushNotifications}
-            onValueChange={(value) => updateSetting('pushNotifications', value)}
-            trackColor={{ false: '#E5E7EB', true: '#3B82F6' }}
-            thumbColor="white"
-          />
-        </View>
-
-        <TouchableOpacity style={styles.settingItem}>
-          <View style={styles.settingLeft}>
-            <Lock size={20} color="#3B82F6" />
-            <Text style={styles.settingLabel}>
-              {isArabic ? 'تغيير كلمة المرور' : 'Change Password'}
-            </Text>
-          </View>
-          <Text style={styles.settingArrow}>→</Text>
-        </TouchableOpacity>
-      </View>
-
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <LogOut size={20} color="#EF4444" />
         <Text style={styles.logoutText}>
@@ -413,14 +461,6 @@ export default function ProfileScreen() {
           </Text>
           <Text style={styles.helpArrow}>→</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.helpItem}>
-          <Settings size={20} color="#3B82F6" />
-          <Text style={styles.helpLabel}>
-            {isArabic ? 'شروط الاستخدام' : 'Terms of Service'}
-          </Text>
-          <Text style={styles.helpArrow}>→</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.appInfo}>
@@ -428,16 +468,16 @@ export default function ProfileScreen() {
           {isArabic ? 'إصدار التطبيق: 1.0.0' : 'App Version: 1.0.0'}
         </Text>
         <Text style={styles.copyright}>
-          © 2025 Murbati.ai & Salahuddin Softech Solutions. {isArabic ? 'جميع الحقوق محفوظة' : 'All rights reserved'}
+          © 2025 MindSpark Trivia - Murbati.ai & Salahuddin Softech Solutions
         </Text>
       </View>
     </ScrollView>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, userSettings.darkMode && styles.darkContainer]}>
       <LinearGradient
-        colors={['#3B82F6', '#1D4ED8']}
+        colors={userSettings.darkMode ? ['#1F2937', '#111827'] : ['#3B82F6', '#1D4ED8']}
         style={styles.header}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}>
@@ -495,6 +535,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  darkContainer: {
+    backgroundColor: '#111827',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6B7280',
   },
   header: {
     paddingTop: 60,
@@ -603,6 +657,11 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 14,
     color: '#6B7280',
+    marginBottom: 4,
+  },
+  joinDate: {
+    fontSize: 12,
+    color: '#9CA3AF',
     marginBottom: 12,
   },
   editButton: {
@@ -632,16 +691,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontSize: 16,
     marginBottom: 8,
-  },
-  emailInput: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-    marginBottom: 12,
   },
   editActions: {
     flexDirection: 'row',
@@ -791,10 +840,6 @@ const styles = StyleSheet.create({
   settingValue: {
     fontSize: 14,
     color: '#6B7280',
-  },
-  settingArrow: {
-    fontSize: 16,
-    color: '#9CA3AF',
   },
   logoutButton: {
     flexDirection: 'row',

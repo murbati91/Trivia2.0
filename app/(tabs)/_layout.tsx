@@ -1,33 +1,52 @@
 import { Tabs } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { Chrome as Home, Trophy, Users, Settings, ChartBar as BarChart3 } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { authService } from '../../config/supabase';
 
 export default function TabLayout() {
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminStatus();
+  }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      // Check if user has admin role (you can customize this logic)
+      const isUserAdmin = user?.email === 'admin@murbati.ai' || 
+                         user?.user_metadata?.role === 'admin';
+      setIsAdmin(isUserAdmin);
+    } catch (error) {
+      console.error('Admin check failed:', error);
+    }
+  };
+
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
         tabBarActiveTintColor: '#3B82F6',
-        tabBarInactiveTintColor: '#6B7280',
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E5E7EB',
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 65,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 80,
         },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ size, color }) => (
-            <Home size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'home' : 'home-outline'} 
+              size={24} 
+              color={color}
+              style={{ marginBottom: -3 }}
+            />
           ),
         }}
       />
@@ -35,8 +54,13 @@ export default function TabLayout() {
         name="game"
         options={{
           title: 'Play',
-          tabBarIcon: ({ size, color }) => (
-            <Users size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'game-controller' : 'game-controller-outline'} 
+              size={24} 
+              color={color}
+              style={{ marginBottom: -3 }}
+            />
           ),
         }}
       />
@@ -44,26 +68,43 @@ export default function TabLayout() {
         name="leaderboard"
         options={{
           title: 'Leaderboard',
-          tabBarIcon: ({ size, color }) => (
-            <Trophy size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'trophy' : 'trophy-outline'} 
+              size={24} 
+              color={color}
+              style={{ marginBottom: -3 }}
+            />
           ),
         }}
       />
-      <Tabs.Screen
-        name="admin"
-        options={{
-          title: 'Admin',
-          tabBarIcon: ({ size, color }) => (
-            <BarChart3 size={size} color={color} />
-          ),
-        }}
-      />
+      {isAdmin && (
+        <Tabs.Screen
+          name="admin"
+          options={{
+            title: 'Admin',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons 
+                name={focused ? 'settings' : 'settings-outline'} 
+                size={24} 
+                color={color}
+                style={{ marginBottom: -3 }}
+              />
+            ),
+          }}
+        />
+      )}
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ size, color }) => (
-            <Settings size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'person' : 'person-outline'} 
+              size={24} 
+              color={color}
+              style={{ marginBottom: -3 }}
+            />
           ),
         }}
       />

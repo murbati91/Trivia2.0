@@ -17,16 +17,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.murbati.mindspark-trivia",
-      "icon": "./assets/images/icon.png"
+      "bundleIdentifier": "com.murbati.mindspark-trivia"
     },
     "android": {
+      "package": "com.murbati.mindsparkTrivia",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#3B82F6"
-      },
-      "package": "com.murbati.mindspark_trivia",
-      "icon": "./assets/images/icon.png"
+      }
     },
     "web": {
       "bundler": "metro",
